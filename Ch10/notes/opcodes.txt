@@ -1,0 +1,139 @@
+The stack grows UPWARD? (Opposite to common CPU impl)
+DATA are in BIG ENDIAN!
+
+0x1: [OPC-size = 3] (LDCONST, PUSH 2-byte data)
+   push <WORD @ IP>
+
+0x2: [OPC-size = 3] (LDCONSTPTR, PUSH FAR data)
+   push <data from POINTER <WORD @ IP>>
+   (resolved by opcode_buffer_base[<WORD @ IP> * 8 + 0x810])
+
+0x3: [OPC-size = 3] (ADDCONSTPTR, ADD FAR data to value on stack)
+   add qword [rsp - 8] <data from POINTER <WORD @ IP>>
+   (resolved by opcode_buffer_base[<WORD @ IP> * 8 + 0x810])
+
+0x4: [OPC-size = 3] (STCONSTPTR, POP data into FAR storage)
+   pop rax
+   mov qword opcode_buffer_base[<WORD @ IP> * 8 + 0x810], rax
+
+0x5: [OPC-size = 1] (LDPTR, POP data as pointer position and retrieve the data from FAR storage)
+   pop rax
+   mov rax, qword opcode_buffer_base[rax * 8 + 0x810]
+   push rax
+
+0x6: [OPC-size = 1] (STPTR, POP data and store the data into FAR storage using next POP data as index)
+   pop rcx
+   pop rax
+   mov qword opcode_buffer_base[rax * 8 + 0x810], rcx
+
+0x7: [OPC-size = 1] (DUP, duplicate the current stack top data and push it back in)
+   push qword [RSP]
+
+0x8: [OPC-size = 1] (POP, POP into nothing)
+
+0x9: [OPC-size = 1] (ADD, pop the stack top as data and add it to the value right below it (which is the new stack top!))
+   pop rax
+   add qword [rsp], rax
+
+0xA: [OPC-size = 3] (ADDCONST the <WORD @ IP> onto the value at the stack top)
+   movzx ax, <WORD @ IP>
+   add [rsp], rax
+
+0xB: [OPC-size = 1] (SUB, special sub that substracts the value at the stack top from the value below it, without moving the stack top)
+   mov rax, [rsp]
+   sub [rsp + 8], rax
+
+0xC: [OPC-size = 1] (DIV, pop the stack as the denominator, and then the numerator. Store the quotient at the new stack top (overwrite!))
+   pop rcx
+   mov rax, [rsp]
+   xor edx, edx
+   div rcx
+   mov [rsp], rax
+
+0xD: [OPC-size = 1] (MUL, pop 2 values on the stack top, multiply them together and push the result back.)
+   pop rax
+   imul [rsp]
+   mov [rsp], rax
+
+0xE: [opc-size = 3] (BR, ABS_JMP, by setting the new IP to current <WORD @ IP>)
+   JMP to <WORD @ IP>
+
+0xF: [opc-size = 3] (BRTRUE, ABS-JMP-if-true, pop the stack top, and jump to the new IP specified by current <WORD @ IP> if the value is not zero.)
+   JZ to <WORD @ IP>
+
+0x10: [opc-size = 3] (BRFALSE, ABS-JMP-if-false, pop the stack top, and jump to the new IP specified by current <WORD @ IP> if the value is not zero.)
+   JNZ to <WORD @ IP>
+
+0x11: [opc-size = 1] (EQ, pop 2 values on the stack top, test if they are equal, and then push the boolean back into the stack)
+   pop rax
+   pop rcx
+   cmp rax, rcx
+   sete rax
+   push rax
+
+0x12: [opc-size = 1] (LT, pop 2 values on the stack top, test if the 2nd popped value is less than the first popped one, and then push the boolean back into the stack)
+   pop rax
+   pop rcx
+   cmp rcx, rax
+   setl rax
+   push rax
+
+0x13: [OPC-size = 1] (LE)
+   pop rax
+   pop rcx
+   cmp rcx, rax
+   setle rax
+   push rax
+
+0x14: [OPC-size = 1] (GT)
+   pop rax
+   pop rcx
+   cmp rcx, rax
+   setg rax
+   push rax
+
+0x15: [OPC-size = 1] (GE)
+   pop rax
+   pop rcx
+   cmp rcx, rax
+   setge rax
+   push rax
+
+0x16: [OPC-size = 3] (GECONST, but test if the stack top is greater than the <WORD @ IP>)
+   pop rax
+   cmp rax, <WORD @ IP>
+   setge rax
+   push rax
+
+0x17: [OPC-size = 1] (MAGIK1, RET-CHECKMARK, pop the stack top into the validity mark and return.)
+
+0x18: [OPC-size = 1] (RET, HALT)
+   hlt
+
+0x19: [OPC-size = 1] (MAGIK2, RET-CHECKMARK, pop the stack top into the validity mark and return. Same as 0x17)
+
+0x1A: [OPC-size = 1] (XOR, xor the top two popped values on the stack and push the result back)
+
+0x1B: [OPC-size = 1] (OR, bitwise-or the top two popped values on the stack and push the result back)
+
+0x1C: [OPC-size = 1] (AND, bitwise-and the top two popped values on the stack and push the result back)
+
+0x1D: [OPC-size = 1] (MOD, MODULO, pop the denominator, and then the numerator. Push the remain back into the stack.)
+
+0x1E: [OPC-size = 1] (SHL, pop the shift amount and then the value to be shifted. Push the result back.)
+
+0x1F: [OPC-size = 1] (SHR, pop the shift amount and then the value to be shifted. Push the result back.)
+
+0x20: [OPC-size = 1] (ROL32, pop the rotation amount in bits and then the value to be rotated. Push the result back.)
+
+0x21: [OPC-size = 1] (ROR32, pop the rotation amount in bits and then the value to be rotated. Push the result back.)
+
+0x22: [OPC-size = 1] (ROL16, pop the rotation amount in bits and then the value to be rotated. Push the result back.)
+
+0x23: [OPC-size = 1] (ROR16, pop the rotation amount in bits and then the value to be rotated. Push the result back.)
+
+0x24: [OPC-size = 1] (ROL8, pop the rotation amount in bits and then the value to be rotated. Push the result back.)
+
+0x25: [OPC-size = 1] (ROR8, pop the rotation amount in bits and then the value to be rotated. Push the result back.)
+
+0x26: [OPC-size = 1] (SYS_WRITE, pop a char from the stack top and print it out.)
