@@ -11,26 +11,26 @@ Knowing that it's a UEFI program, I just threw it into IDA. At first glance, the
 <figure>
   <img src="./imgs/fig01.png" alt="Fig. 1"/>
   <figcaption>Fig. 1: Function at 0x31BC4 referencing the text ".c4tb"</figcaption>
-</figure>
+</figure><br/><br/>
 
 The function also contains some other promising texts, such as the JPG magic bytes "JFIF". It even comes with a reference to that eye-catching file "DilbootApp.efi.enc". The author is indeed quite forgiving, and I figured out what many crucial functions are by making assumptions based on the console output texts.  
 
 <figure>
   <img src="./imgs/fig02.png" alt="Fig. 2"/>
   <figcaption>Fig. 2: A sample part of the function that checks the magic bytes of an encrypted file input.</figcaption>
-</figure>
+</figure><br/><br/>
 
 Also, the corresponding command is "decrypt_file", and by looking for references to the filename buffer, it's obvious that calls to function at 0x168D4 are to retrieve command line arguments by an index.  
 
 <figure>
   <img src="./imgs/fig03.png" alt="Fig. 3"/>
-</figure>
+</figure><br/><br/>
 
 Scrolling down the function shows an if block with some console output suggesting that it will decrypt "DilbootApp.efi" when certain conditions are met. Looking around for the condition variables suggests that once all three jpeg files are decrypted, the program will also decrypt the EFI file as a treat.  
 
 <figure>
   <img src="./imgs/fig04.png" alt="Fig. 4"/>
-</figure>
+</figure><br/><br/>
 
 The mentioned conditions are set when the derived RC4 key has a certain CRC32-like sum. From this decrypt_file function and the RC4 implementation, it seemed like a valid password/key must be 16-byte long, and it is impossible to recover the passwords from these checksums. Furthermore, the actual checks that determine whether it should proceed to decrypt a file aren't related to those marks anyway; instead, they reside in the function at 0x31274.  
 
@@ -40,7 +40,7 @@ From IDA outputs, I found that the decrypt_file function parses the first 16 byt
 
 <figure>
   <img src="./imgs/fig05.png" alt="Fig. 5"/>
-</figure>
+</figure><br/><br/>
 
 At this point, all I have to do is to get an idea of what all the opcodes are and recover the bytecodes' logic in each of the c4tb files. I put my notes detailing the opcodes in [`notes/opcodes.txt`](./notes/opcodes.txt) and my simple disassembler in [`src/vm-disasm.js`](./src/vm-disasm.js).  
 
@@ -60,7 +60,7 @@ To my surprise, throwing those reassembled "shellcode" binaries in IDA produced 
 This one is simple. The password is just a stack string with the 2nd, 9th, 13th, and 15th bytes rotated.  
 <figure>
   <img src="./imgs/fig06.png" alt="Fig. 6"/>
-</figure>
+</figure><br/><br/>
   
 **Password**: `DaCubicleLife101`  
   
@@ -69,7 +69,7 @@ This one is simple. The password is just a stack string with the 2nd, 9th, 13th,
 This one is also fairly simple. It's just a hard-coded XOR "encryption" loop.  
 <figure>
   <img src="./imgs/fig07.png" alt="Fig. 7"/>
-</figure>
+</figure><br/><br/>
   
 **Password**: `G3tDaJ0bD0neM4te`  
 
@@ -174,7 +174,7 @@ Running the given ROM in QEMU and supplying my findings indeed made the shell de
 
 <figure>
   <img src="./imgs/fig08.png" alt="Fig. 8"/>
-</figure>
+</figure><br/><br/>
 
 ## Where's the Flag?
 

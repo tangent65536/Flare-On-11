@@ -11,7 +11,7 @@ This program has a really simple main function. Input a 32-char flag, and it tel
 <figure>
   <img src="./imgs/fig01.png" alt="Fig. 1"/>
   <figcaption>Fig. 1: Main function in IDA</figcaption>
-</figure>
+</figure><br/><br/>
 
 The well-paved road ends right here.  
 
@@ -19,7 +19,7 @@ At first glance, it looks like the shellcode is encrypted. I tried to debug it w
 
 <figure>
   <img src="./imgs/fig02.png" alt="Fig. 2"/>
-</figure>
+</figure><br/><br/>
 
 This certainly reminded me of a popular malware cryptor named "GuLoader" which uses VEH to obfuscate its control flow. But, doing so requires the program to set up a custom exception handler beforehand. Where is it in this challenge?  
 
@@ -27,28 +27,28 @@ In MSVC, C/C++ programs are linked against a C runtime (CRT) stub that populates
 
 <figure>
   <img src="./imgs/fig03.png" alt="Fig. 3"/>
-</figure>
+</figure><br/><br/>
 
 It turned out that the API used here is `RtlInstallFunctionTableCallback`, set up by the last function at `0x140001030` in the pre-main list.  
 
 <figure>
   <img src="./imgs/fig04.png" alt="Fig. 4"/>
   <figcaption>Fig. 4: Retrieving the address of RtlInstallFunctionTableCallback in NTDLL</figcaption>
-</figure>
+</figure><br/><br/>
 
 <figure class="image">
   <img src="./imgs/fig05.png" alt="Fig. 5">
   <figcaption>Fig. 5: Setting up exception callback with RtlInstallFunctionTableCallback</figcaption>
-</figure>
+</figure><br/><br/>
 
-## Exception-Based Control Flow Bbfuscation
+## Exception-Based Control Flow Obfuscation
 
 On MSDN, it says that `RtlInstallFunctionTableCallback` installs a callback function that provides unwind information for dynamic codes. Essentially, a program may use this to define a region of code that, when an exception is thrown within the region, the kernel will instruct the user-mode handler to make a call to the installed callback function and will use the `RUNTIME_FUNCTION` structure returned by the callback function to determine how it should unwind (a.k.a. revert) the execution and handle the exception.  
 
 <figure class="image">
   <img src="./imgs/fig06.png" alt="Fig. 6">
   <figcaption>Fig. 6: Callback function at 0x1400010B0</figcaption>
-</figure>
+</figure><br/><br/>
 
 But how exactly does Windows unwind the execution and return the execution back to the code in this defined region? It turns out [MSDN also has a dedicated page to document this](https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64).
 
@@ -56,7 +56,7 @@ From the implementation of the callback function, I learned that only the 3rd it
 
 <figure class="image">
   <img src="./imgs/fig07.png" alt="Fig. 7">
-</figure>
+</figure><br/><br/>
 
 Oof. That wasn't as simple as what I was expecting. Therefore, I decided to just debug the program and take a look at the data first.  
 
@@ -81,14 +81,14 @@ With an understanding of how exceptions are processed in the shellcode, I can no
 <figure class="image">
   <img src="./imgs/fig08.png" alt="Fig. 8">
   <figcaption>Fig. 8: An example of the self-modification pattern (in its decoded/valid state).</figcaption>
-</figure>
+</figure><br/><br/>
 
 Another pattern of self-modifying codes is the call-return stub. A `pop` writing to an IMM32 relative address follows right after a `call`. Later in the code, that address gets a small increment and is eventually moved back into `[rsp]`.  
 
 <figure class="image">
   <img src="./imgs/fig09.png" alt="Fig. 9">
   <figcaption>Fig. 9: An example of the call-return stubs (in its valid state).</figcaption>
-</figure>
+</figure><br/><br/>
 
 To make my life easier, I made a bunch of assumptions after walking through several instances of those patterns, and I implemented some simple detections to deal with them.  
  1. *Assumption*: self-modifying instructions (type 1) always have the structure:
@@ -131,7 +131,7 @@ Since the jump destination is modified by a conditional `mov`, it is no longer s
 
 <figure class="image">
   <img src="./imgs/fig10.png" alt="Fig. 10">
-</figure>
+</figure><br/><br/>
 
 ## Unwind Codes Revisited
 
@@ -148,7 +148,7 @@ After replacing those pointer references with simple `mov`s, I noticed yet anoth
 Let's take a look at an example in the shellcode.  
 <figure class="image">
   <img src="./imgs/fig11.png" alt="Fig. 11">
-</figure>
+</figure><br/><br/>
 
 Following the documentation of `UNWIND_CODE` on [MSDN](https://learn.microsoft.com/en-us/cpp/build/exception-handling-x64#struct-unwind_code), I converted the opcodes into equivalent x64 pseudo operations. E.g.
 ```
@@ -203,7 +203,7 @@ Deobfuscation results finally looked somewhat wellformed in IDA, and I decided i
 <figure class="image">
   <img src="./imgs/fig12.png" alt="Fig. 12">
   <figcaption>Fig. 12: Part of the deobfuscation results (blob 1) in IDA</figcaption>
-</figure>
+</figure><br/><br/>
 
 ## Math
 
